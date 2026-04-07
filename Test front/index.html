@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuropetitorius - Partner Test UI</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #1a1a2e; margin-bottom: 20px; }
+        h2 { color: #16213e; margin: 20px 0 10px; border-bottom: 2px solid #0f3460; padding-bottom: 5px; }
+        
+        .section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #333; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        textarea { min-height: 100px; resize: vertical; }
+        
+        button { background: #0f3460; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px; margin-bottom: 10px; }
+        button:hover { background: #16213e; }
+        button.secondary { background: #6c757d; }
+        button.success { background: #28a745; }
+        button.danger { background: #dc3545; }
+        
+        .response { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin-top: 15px; white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+        
+        .tabs { display: flex; border-bottom: 2px solid #dee2e6; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 14px; }
+        .tab.active { border-bottom: 2px solid #0f3460; font-weight: 600; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        
+        .session-list { border: 1px solid #dee2e6; border-radius: 4px; max-height: 200px; overflow-y: auto; }
+        .session-item { padding: 10px; border-bottom: 1px solid #dee2e6; cursor: pointer; }
+        .session-item:hover { background: #f8f9fa; }
+        .session-item.active { background: #e7f3ff; }
+        
+        .chat { border: 1px solid #dee2e6; border-radius: 4px; height: 400px; display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 15px; }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; }
+        .message.student { background: #e7f3ff; margin-left: 20%; }
+        .message.tutor { background: #f0f0f0; margin-right: 20%; }
+        .message-role { font-size: 11px; color: #666; margin-bottom: 5px; }
+        .chat-input { display: flex; padding: 10px; border-top: 1px solid #dee2e6; }
+        .chat-input input { flex: 1; margin-right: 10px; }
+        
+        .file-upload { border: 2px dashed #dee2e6; padding: 20px; text-align: center; border-radius: 4px; cursor: pointer; }
+        .file-upload:hover { border-color: #0f3460; }
+        
+        .status { padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #cce5ff; color: #004085; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Neuropetitorius Partner Test UI</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('content')">Content Ingestion</button>
+            <button class="tab" onclick="showTab('sessions')">Sessions</button>
+            <button class="tab" onclick="showTab('tutor')">AI Tutor</button>
+        </div>
+        
+        <!-- Content Tab -->
+        <div id="content-tab">
+            <div class="section">
+                <h2>📤 Upload Content</h2>
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="apiKey" value="npk_xy1rLr38P-UIqA1YCM1zxmr4vXM5K3-dZ5DSHcRU">
+                </div>
+                <div class="form-group">
+                    <label>Topic ID</label>
+                    <input type="text" id="topicId" placeholder="e.g., math-algebra-101">
+                </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="contentTitle" placeholder="e.g., Algebra Basics">
+                </div>
+                <div class="form-group">
+                    <label>Subject (optional)</label>
+                    <input type="text" id="subject" placeholder="e.g., Mathematics">
+                </div>
+                <div class="form-group">
+                    <label>Language</label>
+                    <select id="language">
+                        <option value="lt">Lithuanian</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Content (text)</label>
+                    <textarea id="contentText" placeholder="Paste your lesson content here..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Or Upload File</label>
+                    <input type="file" id="contentFile" accept=".pdf,.docx,.xlsx,.txt,.jpg,.jpeg,.png">
+                </div>
+                <button onclick="uploadContent()">Upload Content</button>
+                <button class="secondary" onclick="loadContentList()">Refresh List</button>
+                <div id="contentResponse" class="response" style="display:none;"></div>
+            </div>
+            
+            <div class="section">
+                <h2>📋 Content List</h2>
+                <button class="secondary" onclick="loadContentList()">Load All Content</button>
+                <div id="contentList" class="response" style="display:none;"></div>
+            </div>
+        </div>
+        
+        <!-- Sessions Tab -->
+        <div id="sessions-tab" style="display:none;">
+            <div class="grid">
+                <div class="section">
+                    <h2>➕ Create Session</h2>
+                    <div class="form-group">
+                        <label>Topic ID</label>
+                        <input type="text" id="sessionTopicId" placeholder="e.g., math-algebra-101">
+                    </div>
+                    <div class="form-group">
+                        <label>Student External ID</label>
+                        <input type="text" id="studentExternalId" placeholder="e.g., student-123">
+                    </div>
+                    <div class="form-group">
+                        <label>Session Title</label>
+                        <input type="text" id="sessionTitle" placeholder="e.g., Math tutoring">
+                    </div>
+                    <button onclick="createSession()">Create Session</button>
+                    <div id="sessionResponse" class="response" style="display:none;"></div>
+                </div>
+                
+                <div class="section">
+                    <h2>📂 Your Sessions</h2>
+                    <button class="secondary" onclick="loadSessions()">Refresh Sessions</button>
+                    <div id="sessionsList" class="session-list" style="display:none;"></div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🗑️ Delete Session</h2>
+                <div class="form-group">
+                    <label>Session ID</label>
+                    <input type="text" id="deleteSessionId" placeholder="Enter session ID to delete">
+                </div>
+                <button class="danger" onclick="deleteSession()">Delete Session</button>
+                <div id="deleteSessionResponse" class="response" style="display:none;"></div>
+            </div>
+        </div>
+        
+        <!-- Tutor Tab -->
+        <div id="tutor-tab" style="display:none;">
+            <div class="grid">
+                <div class="section">
+                    <h2>💬 Chat</h2>
+                    <div class="form-group">
+                        <label>Select Session</label>
+                        <select id="chatSessionSelect" onchange="loadMessages()">
+                            <option value="">-- Select a session --</option>
+                        </select>
+                    </div>
+                    <div class="chat">
+                        <div class="chat-messages" id="chatMessages">
+                            <p style="color: #666; text-align: center;">Select a session to start chatting</p>
+                        </div>
+                        <div class="chat-input">
+                            <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter')sendMessage()">
+                            <button onclick="sendMessage()">Send</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>🔧 Test Controls</h2>
+                    <div class="form-group">
+                        <label>Quick Test - Send Message</label>
+                        <input type="text" id="testMessage" placeholder="Test message">
+                    </div>
+                    <button onclick="quickTest()">Send Test Message</button>
+                    <div id="tutorResponse" class="response" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/v1';
+        let currentApiKey = '';
+        
+        function getApiKey() {
+            return document.getElementById('apiKey').value;
+        }
+        
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('[id$="-tab"]').forEach(t => t.style.display = 'none');
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').style.display = 'block';
+        }
+        
+        async function apiCall(endpoint, options = {}) {
+            const apiKey = getApiKey();
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                ...options.headers
+            };
+            
+            try {
+                const response = await fetch(API_BASE + endpoint, {
+                    ...options,
+                    headers
+                });
+                
+                const data = await response.json();
+                return { status: response.status, data };
+            } catch (error) {
+                return { status: 0, data: { error: error.message } };
+            }
+        }
+        
+        // Content Functions
+        async function uploadContent() {
+            const topicId = document.getElementById('topicId').value;
+            const title = document.getElementById('contentTitle').value;
+            const subject = document.getElementById('subject').value;
+            const language = document.getElementById('language').value;
+            const contentText = document.getElementById('contentText').value;
+            const fileInput = document.getElementById('contentFile');
+            
+            if (!topicId || !title) {
+                showStatus('contentResponse', 'Topic ID and Title are required', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('topic_id', topicId);
+            formData.append('title', title);
+            if (subject) formData.append('subject', subject);
+            formData.append('language', language);
+            if (contentText) formData.append('content', contentText);
+            if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
+            
+            const response = await apiCall('/content/ingest', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const responseDiv = document.getElementById('contentResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = JSON.stringify(response.data, null, 2);
+            responseDiv.className = 'response ' + (response.status === 200 ? 'success' : 'error');
+        }
+        
+        async function loadContentList() {
+            const response = await apiCall('/content?limit=50');
+            const listDiv = document.getElementById('contentList');
+            listDiv.style.display = 'block';
+            listDiv.textContent = JSON.stringify(response.data, null, 2);
+        }
+        
+        // Session Functions
+        async function createSession() {
+            const topicId = document.getElementById('sessionTopicId').value;
+            const studentId = document.getElementById('studentExternalId').value;
+            const title = document.getElementById('sessionTitle').value;
+            
+            if (!topicId || !studentId) {
+                showStatus('sessionResponse', 'Topic ID and Student ID are required', 'error');
+                return;
+            }
+            
+            const response = await apiCall('/sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic_id: topicId,
+                    student_external_id: studentId,
+                    title: title || 'Tutoring Session'
+                })
+            });
+            
+            const responseDiv = document.getElementById('sessionResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = JSON.stringify(response.data, null, 2);
+            responseDiv.className = 'response ' + (response.status === 201 ? 'success' : 'error');
+            
+            if (response.status === 201) {
+                loadSessions();
+                updateSessionSelect();
+            }
+        }
+        
+        async function loadSessions() {
+            const response = await apiCall('/sessions');
+            const listDiv = document.getElementById('sessionsList');
+            listDiv.style.display = 'block';
+            
+            if (response.data.sessions) {
+                listDiv.innerHTML = response.data.sessions.map(s => 
+                    `<div class="session-item" onclick="selectSession('${s.session_id}')">
+                        <strong>${s.title || 'Session'}</strong><br>
+                        <small>Topic: ${s.topic_id} | Created: ${new Date(s.created_at).toLocaleString()}</small>
+                    </div>`
+                ).join('');
+            } else {
+                listDiv.innerHTML = '<div style="padding:10px;">No sessions found</div>';
+            }
+            
+            updateSessionSelect();
+        }
+        
+        async function deleteSession() {
+            const sessionId = document.getElementById('deleteSessionId').value;
+            if (!sessionId) {
+                showStatus('deleteSessionResponse', 'Session ID is required', 'error');
+                return;
+            }
+            
+            const response = await apiCall(`/sessions/${sessionId}`, {
+                method: 'DELETE'
+            });
+            
+            const responseDiv = document.getElementById('deleteSessionResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = JSON.stringify(response.data, null, 2);
+            responseDiv.className = 'response ' + (response.status === 200 ? 'success' : 'error');
+            
+            if (response.status === 200) {
+                loadSessions();
+                updateSessionSelect();
+            }
+        }
+        
+        // Tutor Functions
+        async function updateSessionSelect() {
+            const response = await apiCall('/sessions');
+            const select = document.getElementById('chatSessionSelect');
+            select.innerHTML = '<option value="">-- Select a session --</option>';
+            
+            if (response.data.sessions) {
+                response.data.sessions.forEach(s => {
+                    select.innerHTML += `<option value="${s.session_id}">${s.title || s.session_id}</option>`;
+                });
+            }
+        }
+        
+        async function loadMessages() {
+            const sessionId = document.getElementById('chatSessionSelect').value;
+            const messagesDiv = document.getElementById('chatMessages');
+            
+            if (!sessionId) {
+                messagesDiv.innerHTML = '<p style="color: #666; text-align: center;">Select a session to start chatting</p>';
+                return;
+            }
+            
+            const response = await apiCall(`/sessions/${sessionId}`);
+            
+            if (response.data.messages) {
+                messagesDiv.innerHTML = response.data.messages.map(m => 
+                    `<div class="message ${m.role}">
+                        <div class="message-role">${m.role === 'student' ? '👤 Student' : '🧠 AI Tutor'}</div>
+                        ${m.content}
+                    </div>`
+                ).join('');
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+        }
+        
+        async function sendMessage() {
+            const sessionId = document.getElementById('chatSessionSelect').value;
+            const input = document.getElementById('chatInput');
+            const content = input.value.trim();
+            
+            if (!sessionId || !content) return;
+            
+            // Add user message immediately
+            const messagesDiv = document.getElementById('chatMessages');
+            messagesDiv.innerHTML += `<div class="message student"><div class="message-role">👤 Student</div>${content}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            input.value = '';
+            
+            // Send to API
+            const response = await apiCall(`/sessions/${sessionId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            
+            if (response.data.content) {
+                messagesDiv.innerHTML += `<div class="message tutor"><div class="message-role">🧠 AI Tutor</div>${response.data.content}</div>`;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } else {
+                messagesDiv.innerHTML += `<div class="message" style="background:#ffebee;">Error: ${JSON.stringify(response.data)}</div>`;
+            }
+        }
+        
+        async function quickTest() {
+            const sessionId = document.getElementById('chatSessionSelect').value;
+            const message = document.getElementById('testMessage').value;
+            
+            if (!sessionId || !message) {
+                showStatus('tutorResponse', 'Select a session and enter a message', 'error');
+                return;
+            }
+            
+            const response = await apiCall(`/sessions/${sessionId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message })
+            });
+            
+            const responseDiv = document.getElementById('tutorResponse');
+            responseDiv.style.display = 'block';
+            responseDiv.textContent = JSON.stringify(response.data, null, 2);
+            responseDiv.className = 'response ' + (response.data.content ? 'success' : 'error');
+            
+            loadMessages();
+        }
+        
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.textContent = message;
+            el.className = 'response status ' + type;
+        }
+        
+        // Initialize
+        loadSessions();
+        updateSessionSelect();
+    </script>
+</body>
+</html>

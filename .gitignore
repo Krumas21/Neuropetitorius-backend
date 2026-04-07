@@ -1,0 +1,18 @@
+# Test files (not for git)
+Help.docx
+Help.pdf
+IMG_3685.JPG
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation build
+Docs/_build/

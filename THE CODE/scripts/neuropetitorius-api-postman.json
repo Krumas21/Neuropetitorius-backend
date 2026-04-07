@@ -1,0 +1,146 @@
+{
+  "info": {
+    "name": "Neuropetitorius API",
+    "description": "B2B AI Tutoring API for testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "npk_ljH6q1Ds_LmH-p6P5u9X_v0ehm3z1sdaG3nCbeE4",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/v1/health"
+      }
+    },
+    {
+      "name": "Ingest Content",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/v1/content/ingest",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"topic_id\": \"math-grade-9-quadratics\",\n  \"title\": \"Quadratic Equations\",\n  \"subject\": \"mathematics\",\n  \"language\": \"lt\",\n  \"content\": \"A quadratic equation has the form ax² + bx + c = 0. The solutions can be found using the quadratic formula: x = (-b ± √(b²-4ac)) / 2a.\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Create Session",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/v1/sessions",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"student_external_id\": \"student-12345\",\n  \"topic_id\": \"math-grade-9-quadratics\",\n  \"language\": \"lt\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Get Session",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "sessions", "{{sessionId}}"]
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Send Message (Chat)",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}/messages",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "sessions", "{{sessionId}}", "messages"]
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"content\": \"Kas yra kvadratinė lygtis?\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Delete Session",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "sessions", "{{sessionId}}"]
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Delete Content",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{baseUrl}}/v1/content/{{topicId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "content", "{{topicId}}"]
+        },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{apiKey}}"
+          }
+        ]
+      }
+    }
+  ]
+}

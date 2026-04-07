@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: neuro
+      POSTGRES_PASSWORD: neuro_dev_password
+      POSTGRES_DB: neuro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neuro"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENV: development
+      DATABASE_URL: postgresql+asyncpg://neuro:neuro_dev_password@postgres:5432/neuro
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyCQINjdjek9lk_Y_2JFNLDksZ0V0jTykes}
+      GEMINI_GENERATION_MODEL: gemini-3-flash-preview
+      GEMINI_EMBEDDING_MODEL: gemini-embedding-001
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+
+volumes:
+  pgdata:
