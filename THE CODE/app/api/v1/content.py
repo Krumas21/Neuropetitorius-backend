@@ -37,7 +37,10 @@ async def ingest_content(
     partner: CurrentPartnerDep,
     topic_id: str = Form(..., max_length=256),
     title: str = Form(..., max_length=512),
+    class_id: str | None = Form(None, max_length=64),
+    class_name: str | None = Form(None, max_length=128),
     subject: str | None = Form(None, max_length=64),
+    chapter: str | None = Form(None, max_length=256),
     language: str = Form(default="lt", max_length=10),
     content: str | None = Form(None, min_length=10, max_length=500000),
     file: UploadFile | None = File(None),
@@ -74,7 +77,10 @@ async def ingest_content(
         partner_id=uuid.UUID(partner.id),
         topic_id=topic_id,
         title=title,
+        class_id=class_id,
+        class_name=class_name,
         subject=subject,
+        chapter=chapter,
         language=language,
         raw_content=content,
         content_hash=content_hash,
@@ -144,3 +150,42 @@ async def delete_content(
         return {"message": "Content not found"}
 
     return {"message": "Content deleted"}
+
+
+@router.get("/content")
+async def list_content(
+    db: DbSession,
+    partner: CurrentPartnerDep,
+    class_id: str | None = None,
+    class_name: str | None = None,
+    subject: str | None = None,
+    chapter: str | None = None,
+    topic_id: str | None = None,
+    limit: int = 50,
+) -> dict:
+    """List content with optional filters."""
+    items = await content_repo.list_by_partner(
+        db,
+        partner_id=uuid.UUID(partner.id),
+        class_id=class_id,
+        class_name=class_name,
+        subject=subject,
+        chapter=chapter,
+        topic_id=topic_id,
+        limit=limit,
+    )
+    return {
+        "content_items": [
+            {
+                "topic_id": item.topic_id,
+                "title": item.title,
+                "class_id": item.class_id,
+                "class_name": item.class_name,
+                "subject": item.subject,
+                "chapter": item.chapter,
+                "language": item.language,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+            for item in items
+        ]
+    }

@@ -56,6 +56,9 @@ class ContentRepository:
         language: str,
         raw_content: str,
         content_hash: str,
+        class_id: str | None = None,
+        class_name: str | None = None,
+        chapter: str | None = None,
     ) -> tuple["ContentItem", bool]:
         """Insert or update content item. Returns (item, is_new)."""
         from sqlalchemy import select
@@ -77,6 +80,9 @@ class ContentRepository:
             item.language = language
             item.raw_content = raw_content
             item.content_hash = content_hash
+            item.class_id = class_id
+            item.class_name = class_name
+            item.chapter = chapter
             await db.commit()
             await db.refresh(item)
             return item, is_new
@@ -89,6 +95,9 @@ class ContentRepository:
             language=language,
             raw_content=raw_content,
             content_hash=content_hash,
+            class_id=class_id,
+            class_name=class_name,
+            chapter=chapter,
         )
         db.add(item)
         await db.commit()
@@ -193,6 +202,40 @@ class ContentRepository:
             select(ContentItem.title).where(ContentItem.id == content_item_id)
         )
         return result.scalar_one_or_none()  # type: ignore[no-any-return]
+
+    async def list_by_partner(
+        self,
+        db,
+        partner_id: uuid.UUID,
+        class_id: str | None = None,
+        class_name: str | None = None,
+        subject: str | None = None,
+        chapter: str | None = None,
+        topic_id: str | None = None,
+        limit: int = 50,
+    ) -> list["ContentItem"]:
+        """List content items with optional filters."""
+        from sqlalchemy import select
+
+        from app.db.models import ContentItem
+
+        query = select(ContentItem).where(ContentItem.partner_id == partner_id)
+
+        if class_id:
+            query = query.where(ContentItem.class_id == class_id)
+        if class_name:
+            query = query.where(ContentItem.class_name == class_name)
+        if subject:
+            query = query.where(ContentItem.subject == subject)
+        if chapter:
+            query = query.where(ContentItem.chapter == chapter)
+        if topic_id:
+            query = query.where(ContentItem.topic_id == topic_id)
+
+        query = query.limit(limit)
+
+        result = await db.execute(query)
+        return list(result.scalars().all())
 
 
 content_repo = ContentRepository()

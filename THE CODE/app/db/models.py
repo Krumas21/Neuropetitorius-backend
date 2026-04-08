@@ -57,9 +57,12 @@ class ContentItem(Base):
     partner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("partners.id", ondelete="CASCADE"), nullable=False
     )
+    class_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    class_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chapter: Mapped[str | None] = mapped_column(String(256), nullable=True)
     topic_id: Mapped[str] = mapped_column(String(256), nullable=False)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
-    subject: Mapped[str | None] = mapped_column(String(64), nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="lt")
     raw_content: Mapped[str] = mapped_column(Text, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)

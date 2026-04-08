@@ -74,17 +74,35 @@
                     <label>API Key</label>
                     <input type="text" id="apiKey" value="npk_xy1rLr38P-UIqA1YCM1zxmr4vXM5K3-dZ5DSHcRU">
                 </div>
-                <div class="form-group">
-                    <label>Topic ID</label>
-                    <input type="text" id="topicId" placeholder="e.g., math-algebra-101">
-                </div>
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="contentTitle" placeholder="e.g., Algebra Basics">
-                </div>
-                <div class="form-group">
-                    <label>Subject (optional)</label>
-                    <input type="text" id="subject" placeholder="e.g., Mathematics">
+                <div class="grid">
+                    <div>
+                        <div class="form-group">
+                            <label>Class ID</label>
+                            <input type="text" id="classId" placeholder="e.g., grade-10">
+                        </div>
+                        <div class="form-group">
+                            <label>Class Name</label>
+                            <input type="text" id="className" placeholder="e.g., Grade 10">
+                        </div>
+                        <div class="form-group">
+                            <label>Subject</label>
+                            <input type="text" id="subject" placeholder="e.g., Mathematics">
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-group">
+                            <label>Chapter</label>
+                            <input type="text" id="chapter" placeholder="e.g., Algebra Chapter 1">
+                        </div>
+                        <div class="form-group">
+                            <label>Topic ID</label>
+                            <input type="text" id="topicId" placeholder="e.g., math-algebra-101">
+                        </div>
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="contentTitle" placeholder="e.g., Algebra Basics">
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Language</label>
@@ -108,6 +126,16 @@
             
             <div class="section">
                 <h2>📋 Content List</h2>
+                <div class="grid">
+                    <div class="form-group">
+                        <label>Filter by Class ID</label>
+                        <input type="text" id="filterClassId" placeholder="e.g., grade-10" onchange="loadContentList()">
+                    </div>
+                    <div class="form-group">
+                        <label>Filter by Subject</label>
+                        <input type="text" id="filterSubject" placeholder="e.g., Mathematics" onchange="loadContentList()">
+                    </div>
+                </div>
                 <button class="secondary" onclick="loadContentList()">Load All Content</button>
                 <div id="contentList" class="response" style="display:none;"></div>
             </div>
@@ -226,7 +254,10 @@
         async function uploadContent() {
             const topicId = document.getElementById('topicId').value;
             const title = document.getElementById('contentTitle').value;
+            const classId = document.getElementById('classId').value;
+            const className = document.getElementById('className').value;
             const subject = document.getElementById('subject').value;
+            const chapter = document.getElementById('chapter').value;
             const language = document.getElementById('language').value;
             const contentText = document.getElementById('contentText').value;
             const fileInput = document.getElementById('contentFile');
@@ -239,7 +270,10 @@
             const formData = new FormData();
             formData.append('topic_id', topicId);
             formData.append('title', title);
+            if (classId) formData.append('class_id', classId);
+            if (className) formData.append('class_name', className);
             if (subject) formData.append('subject', subject);
+            if (chapter) formData.append('chapter', chapter);
             formData.append('language', language);
             if (contentText) formData.append('content', contentText);
             if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
@@ -256,7 +290,14 @@
         }
         
         async function loadContentList() {
-            const response = await apiCall('/content?limit=50');
+            const classId = document.getElementById('filterClassId').value;
+            const subject = document.getElementById('filterSubject').value;
+            
+            let endpoint = '/content?limit=50';
+            if (classId) endpoint += '&class_id=' + encodeURIComponent(classId);
+            if (subject) endpoint += '&subject=' + encodeURIComponent(subject);
+            
+            const response = await apiCall(endpoint);
             const listDiv = document.getElementById('contentList');
             listDiv.style.display = 'block';
             listDiv.textContent = JSON.stringify(response.data, null, 2);
