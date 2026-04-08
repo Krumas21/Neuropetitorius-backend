@@ -1,5 +1,4 @@
 # Neuropetitorius - AI Tutor API
-## Test 123
 
 B2B AI tutoring platform ("Stripe for AI tutoring") for educational platforms.
 
