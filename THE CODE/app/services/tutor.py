@@ -3,24 +3,15 @@
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from pathlib import Path
 
 from app.core.config import settings
 from app.db.repositories import content_repo, message_repo, session_repo, usage_repo
 from app.llm.client import llm_client
 
-SYSTEM_PROMPT = """You are a friendly and knowledgeable AI tutor helping students learn.
-Your goal is to explain concepts clearly, guide students through problems, and encourage critical thinking.
-
-Guidelines:
-- Use simple, clear language appropriate for the student's level
-- Break down complex concepts into smaller, digestible parts
-- When explaining, use examples and analogies
-- Encourage students to think for themselves by asking guiding questions
-- If a student asks about something outside the provided content, acknowledge it and guide them back to the topic
-- Always be patient and supportive
-- Respond in the same language as the student's question
-
-You have access to lesson content about the topic. Use this content to provide accurate, grounded answers."""
+SYSTEM_PROMPT = (Path(__file__).parent.parent / "llm" / "prompts" / "system_prompt.md").read_text(
+    encoding="utf-8"
+)
 
 
 class TutorEngine:
