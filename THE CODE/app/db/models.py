@@ -15,7 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import BIGINT, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -34,12 +34,10 @@ class Partner(Base):
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False)
     rate_limit_rpm: Mapped[int] = mapped_column(Integer, default=1000)
     rate_limit_messages_pm: Mapped[int] = mapped_column(Integer, default=100)
+    allowed_origins: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
-    content_items: Mapped[list["ContentItem"]] = relationship(
-        "ContentItem", back_populates="partner", cascade="all, delete-orphan"
-    )
     sessions: Mapped[list["Session"]] = relationship(
         "Session", back_populates="partner", cascade="all, delete-orphan"
     )
@@ -48,63 +46,46 @@ class Partner(Base):
     )
 
 
-class ContentItem(Base):
-    """Lesson content uploaded by a partner."""
+class SessionChunk(Base):
+    """Session-scoped chunk with embedding for vector search."""
 
-    __tablename__ = "content_items"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    partner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("partners.id", ondelete="CASCADE"), nullable=False
-    )
-    class_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    class_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    subject: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    chapter: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    topic_id: Mapped[str] = mapped_column(String(256), nullable=False)
-    title: Mapped[str] = mapped_column(String(512), nullable=False)
-    language: Mapped[str] = mapped_column(String(10), default="lt")
-    raw_content: Mapped[str] = mapped_column(Text, nullable=False)
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
-    )
-
-    __table_args__ = (
-        UniqueConstraint("partner_id", "topic_id", name="uq_content_item_partner_topic"),
-    )
-
-    partner: Mapped["Partner"] = relationship("Partner", back_populates="content_items")
-    chunks: Mapped[list["ContentChunk"]] = relationship(
-        "ContentChunk", back_populates="content_item", cascade="all, delete-orphan"
-    )
-
-
-class ContentChunk(Base):
-    """Chunked text with embedding for vector search."""
-
-    __tablename__ = "content_chunks"
+    __tablename__ = "session_chunks"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     partner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("partners.id", ondelete="CASCADE"), nullable=False
     )
-    content_item_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("content_items.id", ondelete="CASCADE"), nullable=False
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     __table_args__ = (
-        Index("idx_content_chunks_item", "content_item_id"),
-        Index("idx_content_chunks_partner", "partner_id"),
+        Index("idx_session_chunks_session", "session_id"),
+        Index("idx_session_chunks_partner", "partner_id"),
     )
 
-    content_item: Mapped["ContentItem"] = relationship("ContentItem", back_populates="chunks")
+
+class EmbeddingCache(Base):
+    """Shared embedding cache for avoiding redundant embedding operations."""
+
+    __tablename__ = "embedding_cache"
+
+    id: Mapped[int] = mapped_column(BIGINT, primary_key=True, autoincrement=True)
+    content_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    chunks: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
+    hit_count: Mapped[int] = mapped_column(Integer, default=1)
+    first_cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (Index("idx_embedding_cache_last_used", "last_used_at"),)
 
 
 class Session(Base):
@@ -117,9 +98,12 @@ class Session(Base):
         UUID(as_uuid=True), ForeignKey("partners.id", ondelete="CASCADE"), nullable=False
     )
     student_external_id: Mapped[str] = mapped_column(String(256), nullable=False)
-    topic_id: Mapped[str] = mapped_column(String(256), nullable=False)
     language: Mapped[str] = mapped_column(String(10), default="lt")
-    session_metadata: Mapped[dict] = mapped_column("metadata", JSON, server_default="{}")  # type: ignore[assignment,misc]
+    session_metadata: Mapped[dict] = mapped_column("metadata", JSON, server_default="{}")
+    content_title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_fingerprint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

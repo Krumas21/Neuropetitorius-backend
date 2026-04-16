@@ -256,7 +256,7 @@ The MVP build is broken into 6 milestones. Each milestone is independently shipp
 - [ ] Configure CORS appropriately (locked down by default, configurable per environment)
 - [ ] Set up Caddy reverse proxy in docker-compose for production:
   - [ ] HTTPS via Let's Encrypt
-  - [ ] Proxy `api.neuropetitorius.com → api:8000`
+  - [ ] Proxy `api.neuropetitorius.eu → api:8000`
 - [ ] Deploy to Hetzner Cloud:
   - [ ] Provision a CX22 instance in Falkenstein or Helsinki
   - [ ] Install Docker
@@ -287,7 +287,7 @@ The MVP build is broken into 6 milestones. Each milestone is independently shipp
 - [ ] Smoke test on production server with real Gemini calls
 
 **Definition of done:**
-- Production server is live at api.neuropetitorius.com
+- Production server is live at api.neuropetitorius.eu
 - A developer can read the INTEGRATION_GUIDE.md and integrate without asking questions
 - Demo recording exists and looks good
 - All milestones marked complete

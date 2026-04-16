@@ -13,7 +13,7 @@ The Neuropetitorius AI Tutor API provides programmatic access to our AI-powered 
 
 ```
 http://localhost:8000  (development)
-https://api.neuropetitorius.com  (production)
+https://api.neuropetitorius.eu  (production)
 ```
 
 ### Authentication
@@ -433,10 +433,11 @@ while (true) {
 ## Support
 
 For API support and inquiries:
-- **Email:** api-support@neuropetitorius.com
-- **Documentation:** https://docs.neuropetitorius.com
-- **Status Page:** https://status.neuropetitorius.com
+- **Email:** api-support@neuropetitorius.eu
+- **Documentation:** https://docs.neuropetitorius.eu
+- **Status Page:** https://status.neuropetitorius.eu
 
 ---
 
 *Neuropetitorius AI Tutor API &copy; 2026. All rights reserved.*
+

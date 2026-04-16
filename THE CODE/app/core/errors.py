@@ -82,6 +82,14 @@ class ContentTooLargeError(NeuroError):
         )
 
 
+class ContentTooShortError(NeuroError):
+    def __init__(self):
+        super().__init__(
+            code="CONTENT_TOO_SHORT",
+            message="Content is too short to be a valid lesson",
+        )
+
+
 class TopicNotFoundError(NeuroError):
     def __init__(self):
         super().__init__(
@@ -147,6 +155,7 @@ def _get_status_code(code: str) -> int:
         "RATE_LIMITED": status.HTTP_429_TOO_MANY_REQUESTS,
         "VALIDATION_ERROR": status.HTTP_422_UNPROCESSABLE_ENTITY,
         "CONTENT_TOO_LARGE": status.HTTP_400_BAD_REQUEST,
+        "CONTENT_TOO_SHORT": status.HTTP_400_BAD_REQUEST,
         "TOPIC_NOT_FOUND": status.HTTP_404_NOT_FOUND,
         "SESSION_NOT_FOUND": status.HTTP_404_NOT_FOUND,
         "LLM_UNAVAILABLE": status.HTTP_503_SERVICE_UNAVAILABLE,

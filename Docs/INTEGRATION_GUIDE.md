@@ -1,919 +1,424 @@
 # Neuropetitorius Integration Guide
 
-## Integrate Neuropetitorius AI Tutor in 1 Hour
+## Mode 1: Just-In-Time Content Delivery
 
-This guide walks you through integrating Neuropetitorius into your platform in under 5 minutes. You'll go from zero to your first AI tutoring session.
+This guide walks you through integrating Neuropetitorius in under 1 hour. No content uploads needed — send lesson text inline when creating a session.
 
 ---
 
-## Quick Start (5 Steps in 5 Minutes)
+## Quick Start
 
 ### Step 1: Get Your API Key
 
 Contact Neuropetitorius to obtain your API key. The format is `npk_...`
 
-Example key: `npk_abc123def456`
+**Store this key securely** - it will only be shown once!
 
-### Step 2: Upload Your First Lesson Content
-
-```bash
-# Using curl
-curl -X POST http://localhost:8000/v1/content/ingest \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -F "topic_id=math-algebra-101" \
-  -F "title=Introduction to Algebra" \
-  -F "subject=Mathematics" \
-  -F "language=lt" \
-  -F "content=Algebra is a branch of mathematics that deals with symbols and rules for manipulating those symbols. It is a unifying thread of almost all of mathematics and includes everything from solving elementary equations to studying abstractions such as groups, rings, and fields.
-
-The basic operations in algebra are addition, subtraction, multiplication, and division. For example, if we have the equation x + 5 = 10, we can solve for x by subtracting 5 from both sides: x = 5.
-
-Quadratic equations are equations of the form ax^2 + bx + c = 0, where a, b, and c are constants. The solutions can be found using the quadratic formula: x = (-b ± sqrt(b^2 - 4ac)) / 2a."
-
-# Expected response:
-# {
-#   "topic_id": "math-algebra-101",
-#   "content_item_id": "content-abc123",
-#   "chunks_created": 3,
-#   "tokens_embedded": 450,
-#   "content_changed": true,
-#   "file_processed": false
-# }
-```
-
-### Step 3: Create a Tutoring Session
+### Step 2: Create a Session with Content Inline
 
 ```bash
-curl -X POST http://localhost:8000/v1/sessions \
+curl -X POST https://api.neuropetitorius.eu/v1/sessions \
   -H "Authorization: Bearer npk_abc123def456" \
   -H "Content-Type: application/json" \
   -d '{
-    "topic_id": "math-algebra-101",
     "student_external_id": "student-001",
-    "title": "Algebra Practice Session"
+    "title": "Kvadratinės lygtys — praktika",
+    "language": "lt",
+    "metadata": {"grade_level": 9, "curriculum": "BUP-2025"},
+    "content": {
+      "mode": "inline",
+      "title": "Kvadratinės lygtys",
+      "subject": "mathematics",
+      "text": "# Kvadratinės lygtys\n\nKvadratinė lygtis yra..."
+    }
   }'
 
-# Expected response:
+# Response:
 # {
-#   "session_id": "session-xyz789",
-#   "topic_id": "math-algebra-101",
+#   "session_id": "uuid-here",
 #   "language": "lt",
-#   "created_at": "2026-04-07T10:30:00Z"
+#   "created_at": "2026-04-15T10:30:00Z",
+#   "content_fingerprint": "sha256-first-16",
+#   "chunks_created": 12,
+#   "embedding_cache_hit": false,
+#   "processing_ms": 1340
 # }
 ```
 
-### Step 4: Send a Student Message
+### Step 3: Send a Student Message
 
 ```bash
-curl -X POST http://localhost:8000/v1/sessions/session-xyz789/messages \
+curl -X POST https://api.neuropetitorius.eu/v1/sessions/{session_id}/messages \
   -H "Authorization: Bearer npk_abc123def456" \
   -H "Content-Type: application/json" \
-  -d '{
-    "content": "Kaip spręsti kvadratinę lygtį?"
-  }'
-
-# Expected response:
-# {
-#   "message_id": "msg-123",
-#   "content": "Norėdami išspręsti kvadratinę lygtį ax² + bx + c = 0, naudokite kvadratinę formulę: x = (-b ± √(b² - 4ac)) / 2a. Pirmiausia apskaičiuokite diskriminantą b² - 4ac.",
-#   "role": "assistant",
-#   "created_at": "2026-04-07T10:30:05Z"
-# }
+  -d '{"content": "Kaip spręsti x² - 4 = 0?"}'
 ```
 
-### Step 5: Receive AI Tutor Response
+### Step 4: Receive AI Response
 
-That's it! The AI tutor automatically responds based on the lesson content you uploaded. The response is contextual and in the same language as the content.
-
----
-
-## Prerequisites
-
-- **Python 3.12+** or **Node.js 18+**
-- An API key from Neuropetitorius (format: `npk_...`)
-- Base URL: `http://localhost:8000` (development) or `https://api.neuropetitorius.com` (production)
+The AI tutor responds grounded in your lesson content.
 
 ---
 
-## Detailed Integration
+## Mode 1: How It Works
 
-### Step 1: Get Your API Key
+In Mode 1, there's **no separate content upload**:
 
-Contact Neuropetitorius to get your API key. Format: `npk_...`
+1. **You create a session** — send lesson text inline
+2. **We chunk and embed** — first time is ~1.5s, subsequent times are ~50ms (via cache)
+3. **Student chats** — AI tutors grounded in your lesson
+4. **Session ends** — content disappears when session expires (24h inactivity or explicit delete)
 
-Your API key authenticates all API requests. Keep it secure!
+**Benefits:**
+- No content syncing with us
+- Your IP stays on your servers
+- Simpler integration — one API call
+- GDPR trivially simple — we don't store your content
 
 ---
 
-### Step 2: Upload Content
+## Integration Examples
 
-The content ingestion endpoint processes your educational material and stores it for the AI tutor to reference.
-
-**Endpoint:** `POST /v1/content/ingest`
-
-#### Python Example
+### Python Example
 
 ```python
+import os
 import requests
 
-API_KEY = "npk_abc123def456"
-BASE_URL = "http://localhost:8000"  # Change to production URL in live environment
-
-def upload_content(topic_id: str, title: str, content: str, subject: str = None, language: str = "lt"):
-    """Upload lesson content to Neuropetitorius"""
-    url = f"{BASE_URL}/v1/content/ingest"
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    
-    data = {
-        "topic_id": topic_id,
-        "title": title,
-        "content": content,
-        "subject": subject,
-        "language": language
-    }
-    
-    response = requests.post(url, data=data, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-# Example usage with Lithuanian math content
-result = upload_content(
-    topic_id="math-algebra-101",
-    title="Introduction to Algebra",
-    subject="Mathematics",
-    language="lt",
-    content="""Algebra is a branch of mathematics that deals with symbols and rules for manipulating those symbols.
-    
-The basic operations in algebra are addition, subtraction, multiplication, and division.
-For example, if we have the equation x + 5 = 10, we can solve for x by subtracting 5 from both sides: x = 5.
-
-Quadratic equations are equations of the form ax^2 + bx + c = 0, where a, b, and c are constants.
-The solutions can be found using the quadratic formula: x = (-b ± sqrt(b^2 - 4ac)) / 2a."""
-)
-
-print(f"Content uploaded! Chunks created: {result['chunks_created']}")
-```
-
-#### JavaScript/TypeScript Example
-
-```javascript
-const API_KEY = "npk_abc123def456";
-const BASE_URL = "http://localhost:8000"; // Change to production URL in live environment
-
-async function uploadContent(topicId, title, content, subject = null, language = "lt") {
-  const url = `${BASE_URL}/v1/content/ingest`;
-  
-  const formData = new FormData();
-  formData.append("topic_id", topicId);
-  formData.append("title", title);
-  formData.append("content", content);
-  formData.append("subject", subject);
-  formData.append("language", language);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`
-    },
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error(`Upload failed: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-// Example usage
-const result = await uploadContent(
-  "math-algebra-101",
-  "Introduction to Algebra",
-  `Algebra is a branch of mathematics that deals with symbols and rules for manipulating those symbols.
-
-The basic operations in algebra are addition, subtraction, multiplication, and division.
-For example, if we have the equation x + 5 = 10, we can solve for x by subtracting 5 from both sides: x = 5.
-
-Quadratic equations are equations of the form ax^2 + bx + c = 0, where a, b, and c are constants.
-The solutions can be found using the quadratic formula: x = (-b ± sqrt(b^2 - 4ac)) / 2a.`,
-  "Mathematics",
-  "lt"
-);
-
-console.log(`Content uploaded! Chunks created: ${result.chunks_created}`);
-```
-
-#### curl Example
-
-```bash
-curl -X POST http://localhost:8000/v1/content/ingest \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -F "topic_id=math-algebra-101" \
-  -F "title=Introduction to Algebra" \
-  -F "subject=Mathematics" \
-  -F "language=lt" \
-  -F "content=Algebra is a branch of mathematics..."
-```
-
-#### Lithuanian Math Example Content
-
-```text
-Algebra yra matematikos šaka, dirbanti su simboliais ir taisyklėmis, kaip su jais elgtis.
-Ji yra vientisa beveik visos matematikos gija ir apima viską nuo elementarių lygčių sprendimo iki tokių abstrakcijų kaip grupės, žiedai ir laukai.
-
-Pagrindinės algebrao operacijos yra sudėtis, atimtis, daugyba ir dalyba.
-Pavyzdžiui, jei turime lygtį x + 5 = 10, galime išspręsti x atimdami 5 iš abiejų pusių: x = 5.
-
-Kvadratinės lygtys yra lygtys forma ax² + bx + c = 0, kur a, b, c yra konstantos.
-Sprendimus galima rasti naudojant kvadratinę formulę: x = (-b ± √(b² - 4ac)) / 2a.
-```
-
----
-
-### Step 3: Create a Session
-
-Sessions track individual student tutoring conversations.
-
-**Endpoint:** `POST /v1/sessions`
-
-#### Python Example
-
-```python
-def create_session(topic_id: str, student_external_id: str, title: str):
-    """Create a new tutoring session for a student"""
-    url = f"{BASE_URL}/v1/sessions"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "topic_id": topic_id,
-        "student_external_id": student_external_id,
-        "title": title
-    }
-    
-    response = requests.post(url, json=data, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-# Create a session
-session = create_session(
-    topic_id="math-algebra-101",
-    student_external_id="student-001",
-    title="Algebra Practice Session"
-)
-
-session_id = session["session_id"]
-print(f"Session created: {session_id}")
-```
-
-#### JavaScript Example
-
-```javascript
-async function createSession(topicId, studentExternalId, title) {
-  const response = await fetch(`${BASE_URL}/v1/sessions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      topic_id: topicId,
-      student_external_id: studentExternalId,
-      title: title
-    })
-  });
-  
-  return response.json();
-}
-
-const session = await createSession(
-  "math-algebra-101",
-  "student-001",
-  "Algebra Practice Session"
-);
-
-console.log(`Session created: ${session.session_id}`);
-```
-
-#### curl Example
-
-```bash
-curl -X POST http://localhost:8000/v1/sessions \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topic_id": "math-algebra-101",
-    "student_external_id": "student-001",
-    "title": "Algebra Practice Session"
-  }'
-```
-
----
-
-### Step 4: Chat with the AI Tutor
-
-Send messages and receive AI-generated responses based on your content.
-
-**Endpoint:** `POST /v1/sessions/{session_id}/messages`
-
-#### Python Example (Standard)
-
-```python
-def send_message(session_id: str, content: str):
-    """Send a message to the AI tutor"""
-    url = f"{BASE_URL}/v1/sessions/{session_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {"content": content}
-    
-    response = requests.post(url, json=data, headers=headers)
-    response.raise_for_status()
-    return response.json()
-
-# Send a message (in Lithuanian)
-response = send_message(session_id, "Kaip spręsti kvadratinę lygtį?")
-
-print(f"AI Tutor: {response['content']}")
-```
-
-#### Python Example (Streaming with SSE)
-
-```python
-import requests
-import json
-
-def stream_message(session_id: str, content: str):
-    """Send a message and stream the AI tutor response"""
-    url = f"{BASE_URL}/v1/sessions/{session_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream"
-    }
-    data = {"content": content}
-    
-    with requests.post(url, json=data, headers=headers, stream=True) as response:
-        response.raise_for_status()
-        
-        full_response = ""
-        for line in response.iter_lines():
-            if line:
-                line = line.decode("utf-8")
-                if line.startswith("data: "):
-                    json_str = line[6:]  # Remove "data: " prefix
-                    if json_str.strip():
-                        chunk = json.loads(json_str)
-                        if chunk.get("content"):
-                            full_response += chunk["content"]
-                            print(chunk["content"], end="", flush=True)
-                        if chunk.get("done"):
-                            print("\n[Stream complete]")
-        return full_response
-
-# Stream a response
-print("AI Tutor: ", end="")
-response_text = stream_message(session_id, "Paaiškink man kvadratines lygtis paprastai")
-```
-
-#### JavaScript Example
-
-```javascript
-async function sendMessage(sessionId, content) {
-  const response = await fetch(`${BASE_URL}/v1/sessions/${sessionId}/messages`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ content })
-  });
-  
-  return response.json();
-}
-
-// Send a message
-const response = await sendMessage(session.session_id, "Kaip spręsti kvadratinę lygtį?");
-console.log(`AI Tutor: ${response.content}`);
-```
-
-#### JavaScript Example (Streaming)
-
-```javascript
-async function streamMessage(sessionId, content) {
-  const response = await fetch(`${BASE_URL}/v1/sessions/${sessionId}/messages`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-      "Accept": "text/event-stream"
-    },
-    body: JSON.stringify({ content })
-  });
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let fullResponse = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
-    
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = JSON.parse(line.slice(6));
-        if (data.content) {
-          process.stdout.write(data.content);
-          fullResponse += data.content;
-        }
-        if (data.done) {
-          console.log('\n[Stream complete]');
-        }
-      }
-    }
-  }
-  
-  return fullResponse;
-}
-
-// Stream a response
-process.stdout.write("AI Tutor: ");
-await streamMessage(session.session_id, "Paaiškink man kvadratines lygtis paprastai");
-```
-
-#### curl Example (Standard)
-
-```bash
-curl -X POST http://localhost:8000/v1/sessions/session-xyz789/messages \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Kaip spręsti kvadratinę lygtį?"
-  }'
-```
-
-#### curl Example (Streaming)
-
-```bash
-curl -X POST http://localhost:8000/v1/sessions/session-xyz789/messages \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{
-    "content": "Kaip spręsti kvadratinę lygtį?"
-  }'
-```
-
----
-
-## Full Code Examples
-
-### Complete Python Example
-
-```python
-import requests
-
-# Configuration
-API_KEY = "npk_abc123def456"
-BASE_URL = "http://localhost:8000"  # Production: https://api.neuropetitorius.com
-
-class NeuropetitoriusClient:
-    def __init__(self, api_key: str, base_url: str):
+API_KEY = os.environ.get("NEUROPETITORIUS_API_KEY")
+BASE_URL = "https://api.neuropetitorius.eu"
+
+class NeuroClient:
+    def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = base_url
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"Bearer {api_key}"})
-    
-    def upload_content(self, topic_id: str, title: str, content: str, 
-                       subject: str = None, language: str = "lt") -> dict:
-        """Upload lesson content"""
-        url = f"{self.base_url}/v1/content/ingest"
-        data = {
-            "topic_id": topic_id,
-            "title": title,
-            "content": content,
-            "subject": subject,
-            "language": language
-        }
-        response = self.session.post(url, data=data)
-        response.raise_for_status()
-        return response.json()
-    
-    def create_session(self, topic_id: str, student_external_id: str, 
-                       title: str) -> dict:
-        """Create a tutoring session"""
-        url = f"{self.base_url}/v1/sessions"
+
+    def create_session(
+        self,
+        student_external_id: str,
+        title: str,
+        content_text: str,
+        language: str = "lt",
+        content_title: str = None,
+        content_subject: str = None,
+        metadata: dict = None
+    ) -> dict:
+        """Create a session with inline content."""
+        url = f"{BASE_URL}/v1/sessions"
         response = self.session.post(url, json={
-            "topic_id": topic_id,
             "student_external_id": student_external_id,
-            "title": title
+            "title": title,
+            "language": language,
+            "metadata": metadata or {},
+            "content": {
+                "mode": "inline",
+                "title": content_title or title,
+                "subject": content_subject,
+                "text": content_text
+            }
         })
         response.raise_for_status()
         return response.json()
-    
+
     def send_message(self, session_id: str, content: str) -> dict:
-        """Send a message to the AI tutor"""
-        url = f"{self.base_url}/v1/sessions/{session_id}/messages"
+        url = f"{BASE_URL}/v1/sessions/{session_id}/messages"
         response = self.session.post(url, json={"content": content})
         response.raise_for_status()
         return response.json()
-    
-    def delete_content(self, topic_id: str) -> dict:
-        """Delete content for a topic"""
-        url = f"{self.base_url}/v1/content/{topic_id}"
-        response = self.session.delete(url)
-        response.raise_for_status()
-        return response.json()
-    
-    def delete_session(self, session_id: str) -> dict:
-        """Delete a session"""
-        url = f"{self.base_url}/v1/sessions/{session_id}"
-        response = self.session.delete(url)
-        response.raise_for_status()
-        return response.json()
 
-
-# Full integration example
-def main():
-    client = NeuropetitoriusClient(API_KEY, BASE_URL)
-    
-    # Step 1: Upload content
-    print("Step 1: Uploading content...")
-    content_result = client.upload_content(
-        topic_id="math-algebra-101",
-        title="Introduction to Algebra",
-        subject="Mathematics",
-        language="lt",
-        content="""Algebra is a branch of mathematics that deals with symbols and rules for manipulating those symbols.
+    def stream_message(self, session_id: str, content: str):
+        """Generator that yields chunks as they arrive."""
+        url = f"{BASE_URL}/v1/sessions/{session_id}/messages/stream"
+        response = self.session.post(
+            url,
+            json={"content": content},
+            headers={"Accept": "text/event-stream"},
+            stream=True
+        )
+        response.raise_for_status()
         
-The basic operations in algebra are addition, subtraction, multiplication, and division.
-For example, if we have the equation x + 5 = 10, we can solve for x by subtracting 5 from both sides: x = 5.
-
-Quadratic equations are equations of the form ax^2 + bx + c = 0, where a, b, and c are constants.
-The solutions can be found using the quadratic formula: x = (-b ± sqrt(b^2 - 4ac)) / 2a."""
-    )
-    print(f"  Content uploaded! {content_result['chunks_created']} chunks created")
-    
-    # Step 2: Create session
-    print("\nStep 2: Creating session...")
-    session = client.create_session(
-        topic_id="math-algebra-101",
-        student_external_id="student-001",
-        title="Algebra Practice Session"
-    )
-    session_id = session["session_id"]
-    print(f"  Session created: {session_id}")
-    
-    # Step 3: Chat with AI tutor
-    print("\nStep 3: Sending message to AI tutor...")
-    response = client.send_message(session_id, "Kaip spręsti kvadratinę lygtį?")
-    print(f"  AI Tutor: {response['content']}")
-    
-    print("\n✓ Integration complete!")
+        for line in response.iter_lines():
+            if line:
+                data = line.decode("utf-8")
+                if data.startswith("data: "):
+                    yield data[6:]
 
 
-if __name__ == "__main__":
-    main()
+# Usage
+client = NeuroClient(os.environ["NEUROPETITORIUS_API_KEY"])
+
+# When a student opens a lesson → create a session
+lesson_text = """# Kvadratinės lygtys
+
+Kvadratinė lygtis yra algebrinė lygtis, kuri gali būti užrašyta forma:
+ax² + bx + c = 0
+
+Sprendimo formulė:
+x = (-b ± √(b²-4ac)) / 2a"""
+
+session = client.create_session(
+    student_external_id="student-123",
+    title="Kvadratinės lygtys",
+    content_text=lesson_text,
+    language="lt",
+    content_title="Kvadratinės lygtys",
+    content_subject="mathematics"
+)
+
+print(f"Session ID: {session['session_id']}")
+print(f"Content fingerprint: {session['content_fingerprint']}")
+print(f"Cache hit: {session['embedding_cache_hit']}")
+
+# Student chats with AI tutor
+for chunk in client.stream_message(session["session_id"], "Kaip spręsti x² - 4 = 0?"):
+    print(chunk, end="", flush=True)
 ```
 
-### Complete JavaScript Example (Web Integration)
+### Node.js Example
 
 ```javascript
-const API_KEY = "npk_abc123def456";
-const BASE_URL = "http://localhost:8000"; // Production: https://api.neuropetitorius.com
+const BASE_URL = "https://api.neuropetitorius.eu";
 
-class NeuropetitoriusClient {
-  constructor(apiKey, baseUrl) {
+class NeuroClient {
+  constructor(apiKey) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
   }
 
   getHeaders() {
-    return {
-      "Authorization": `Bearer ${this.apiKey}`
-    };
+    return { "Authorization": `Bearer ${this.apiKey}` };
   }
 
-  async uploadContent(topicId, title, content, subject = null, language = "lt") {
-    const formData = new FormData();
-    formData.append("topic_id", topicId);
-    formData.append("title", title);
-    formData.append("content", content);
-    formData.append("subject", subject);
-    formData.append("language", language);
-
-    const response = await fetch(`${this.baseUrl}/v1/content/ingest`, {
+  async createSession(studentExternalId, title, contentText, language = "lt") {
+    const res = await fetch(`${BASE_URL}/v1/sessions`, {
       method: "POST",
-      headers: this.getHeaders(),
-      body: formData
-    });
-    
-    if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
-    return response.json();
-  }
-
-  async createSession(topicId, studentExternalId, title) {
-    const response = await fetch(`${this.baseUrl}/v1/sessions`, {
-      method: "POST",
-      headers: {
-        ...this.getHeaders(),
-        "Content-Type": "application/json"
-      },
+      headers: { ...this.getHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
-        topic_id: topicId,
         student_external_id: studentExternalId,
-        title: title
+        title: title,
+        language: language,
+        content: {
+          mode: "inline",
+          title: title,
+          text: contentText
+        }
       })
     });
-    
-    return response.json();
+    return res.json();
   }
 
   async sendMessage(sessionId, content) {
-    const response = await fetch(`${this.baseUrl}/v1/sessions/${sessionId}/messages`, {
+    const res = await fetch(`${BASE_URL}/v1/sessions/${sessionId}/messages`, {
       method: "POST",
-      headers: {
-        ...this.getHeaders(),
-        "Content-Type": "application/json"
-      },
+      headers: { ...this.getHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ content })
     });
-    
-    return response.json();
+    return res.json();
   }
 
   async *streamMessage(sessionId, content) {
-    const response = await fetch(`${this.baseUrl}/v1/sessions/${sessionId}/messages`, {
+    const res = await fetch(`${BASE_URL}/v1/sessions/${sessionId}/messages/stream`, {
       method: "POST",
-      headers: {
-        ...this.getHeaders(),
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream"
-      },
+      headers: { ...this.getHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ content })
     });
 
-    const reader = response.body.getReader();
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6));
-          if (data.content || data.done) {
-            yield data;
-          }
+      const text = decoder.decode(value);
+      for (const line of text.split("\n")) {
+        if (line.startsWith("data: ")) {
+          yield line.slice(6);
         }
       }
     }
   }
-
-  async deleteContent(topicId) {
-    const response = await fetch(`${this.baseUrl}/v1/content/${topicId}`, {
-      method: "DELETE",
-      headers: this.getHeaders()
-    });
-    return response.json();
-  }
-
-  async deleteSession(sessionId) {
-    const response = await fetch(`${this.baseUrl}/v1/sessions/${sessionId}`, {
-      method: "DELETE",
-      headers: this.getHeaders()
-    });
-    return response.json();
-  }
 }
 
-// Example usage in a web application
-async function main() {
-  const client = new NeuropetitoriusClient(API_KEY, BASE_URL);
+// Usage
+const client = new NeuroClient(process.env.NEUROPETITORIUS_API_KEY);
 
-  // Step 1: Upload content
-  console.log("Step 1: Uploading content...");
-  const contentResult = await client.uploadContent(
-    "math-algebra-101",
-    "Introduction to Algebra",
-    `Algebra is a branch of mathematics that deals with symbols and rules for manipulating those symbols.
-    
-The basic operations in algebra are addition, subtraction, multiplication, and division.
-For example, if we have the equation x + 5 = 10, we can solve for x by subtracting 5 from both sides: x = 5.
+const session = await client.createSession(
+  "student-123",
+  "Kvadratinės lygtys",
+  "Kvadratinė lygtis: ax² + bx + c = 0"
+);
 
-Quadratic equations are equations of the form ax^2 + bx + c = 0, where a, b, and c are constants.
-The solutions can be found using the quadratic formula: x = (-b ± sqrt(b^2 - 4ac)) / 2a.`,
-    "Mathematics",
-    "lt"
-  );
-  console.log(`  Content uploaded! ${contentResult.chunks_created} chunks created`);
+for await (const chunk of client.streamMessage(session.session_id, "Paaiškink")) {
+  process.stdout.write(chunk);
+}
+```
 
-  // Step 2: Create session
-  console.log("\nStep 2: Creating session...");
-  const session = await client.createSession(
-    "math-algebra-101",
-    "student-001",
-    "Algebra Practice Session"
-  );
-  console.log(`  Session created: ${session.session_id}`);
+### PHP Example
 
-  // Step 3: Chat with AI tutor
-  console.log("\nStep 3: Sending message to AI tutor...");
-  const response = await client.sendMessage(session.session_id, "Kaip spręsti kvadratinę lygtį?");
-  console.log(`  AI Tutor: ${response.content}`);
+```php
+<?php
+$apiKey = getenv('NEUROPETITORIUS_API_KEY');
+$baseUrl = "https://api.neuropetitorius.eu";
 
-  console.log("\n✓ Integration complete!");
+class NeuroClient {
+    private $apiKey;
+    private $baseUrl;
+
+    public function __construct(string $apiKey, string $baseUrl) {
+        $this->apiKey = $apiKey;
+        $this->baseUrl = $baseUrl;
+    }
+
+    private function request(string $method, string $endpoint, array $data = null) {
+        $url = $this->baseUrl . $endpoint;
+        $ch = curl_init();
+
+        $headers = ["Authorization: Bearer " . $this->apiKey];
+        if ($data) {
+            $headers[] = "Content-Type: application/json";
+            $body = json_encode($data);
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_POSTFIELDS => $body ?? null,
+            CURLOPT_TIMEOUT => 60,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode >= 400) {
+            throw new Exception("API error: HTTP $httpCode");
+        }
+
+        return json_decode($response, true);
+    }
+
+    public function createSession(string $studentExternalId, string $title, string $contentText, string $language = "lt") {
+        return $this->request("POST", "/v1/sessions", [
+            "student_external_id" => $studentExternalId,
+            "title" => $title,
+            "language" => $language,
+            "content" => [
+                "mode" => "inline",
+                "title" => $title,
+                "text" => $contentText
+            ]
+        ]);
+    }
+
+    public function sendMessage(string $sessionId, string $content) {
+        return $this->request("POST", "/v1/sessions/$sessionId/messages", [
+            "content" => $content
+        ]);
+    }
 }
 
-// Run the example
-main().catch(console.error);
+// Usage
+$client = new NeuroClient($apiKey, $baseUrl);
+
+$session = $client->createSession(
+    "student-123",
+    "Kvadratinės lygtys",
+    "Kvadratinė lygtis: ax² + bx + c = 0"
+);
+
+$response = $client->sendMessage($session['session_id'], "Kaip spręsti?");
+echo $response['content'];
+?>
 ```
 
 ---
 
-## Testing Your Integration
+## FAQ
 
-### Verify Your Setup
+### "What if the same student opens the same lesson twice?"
 
-1. **Check API Health**
-   ```bash
-   curl http://localhost:8000/v1/health
-   # Expected: {"status": "ok"}
-   ```
+Two separate sessions, each with its own chunks. The embedding cache means the second one costs almost nothing — we reuse the embeddings from the first call.
 
-2. **Test Authentication**
-   ```bash
-   # Should succeed with valid key
-   curl -X POST http://localhost:8000/v1/sessions \
-     -H "Authorization: Bearer npk_abc123def456" \
-     -H "Content-Type: application/json" \
-     -d '{"topic_id":"test","student_external_id":"test","title":"test"}'
-   
-   # Should fail without key
-   curl -X POST http://localhost:8000/v1/sessions \
-     -H "Content-Type: application/json" \
-     -d '{"topic_id":"test","student_external_id":"test","title":"test"}'
-   # Expected: 401 with error code MISSING_AUTH
-   ```
+### "Can I reuse a session across different lessons?"
 
-3. **Test Full Flow**
-   - Upload content → Create session → Send message → Receive response
+No. One session = one lesson. Create a new session when the student moves to a new lesson.
 
-### Common Issues and Troubleshooting
+### "What's the session lifetime?"
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| `401 INVALID_API_KEY` | Invalid or expired API key | Verify your API key format starts with `npk_` |
-| `401 MISSING_AUTH` | No Authorization header | Add `Authorization: Bearer <key>` header |
-| `404 NOT_FOUND` | Invalid topic_id or session_id | Check that the topic exists before creating session |
-| `429 RATE_LIMIT_EXCEEDED` | Too many requests | Implement request throttling (60 req/min default) |
-| `400 VALIDATION_ERROR` | Missing required field | Check required fields for each endpoint |
-| Empty AI responses | Content not indexed properly | Verify content upload returned `chunks_created > 0` |
+Auto-expires after 24 hours of inactivity. You can delete early if you want.
 
-### Error Response Format
+### "How do I handle long lessons?"
+
+Max 100,000 characters per session. Split longer lessons into chapters and create separate sessions per chapter.
+
+### "Does my content get stored on your servers?"
+
+Only during the active session. Embeddings (numeric vectors, not text) may persist in our cache for 30 days to save on recomputation, but raw text is deleted with the session.
+
+---
+
+## Important Notes
+
+### Performance
+
+- **First session on content**: ~1.5 seconds (embedding via Gemini)
+- **Subsequent sessions**: ~50ms (cache hit)
+
+This is expected. Document this for your frontend team.
+
+### Content Limits
+
+- Minimum: 50 characters
+- Maximum: 100,000 characters
+
+If a lesson is too long, split it into chapters.
+
+### Security
+
+Your students must NEVER call our API directly:
+
+```
+❌ WRONG - Browser → Our API (EXPOSES YOUR API KEY!)
+✅ CORRECT - Your Backend → Our API
+```
+
+---
+
+## Error Handling
 
 ```json
 {
   "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "topic_id is required"
+    "code": "CONTENT_TOO_LARGE",
+    "message": "Content exceeds maximum allowed size"
   }
 }
 ```
 
----
-
-## Advanced Features
-
-### File Upload Support
-
-Upload PDF, DOCX, XLSX, TXT, JPG, or PNG files for content ingestion.
-
-**Python:**
-```python
-def upload_file(topic_id: str, title: str, file_path: str, subject: str = None):
-    """Upload a file as lesson content"""
-    url = f"{BASE_URL}/v1/content/ingest"
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    
-    with open(file_path, "rb") as f:
-        files = {"file": f}
-        data = {
-            "topic_id": topic_id,
-            "title": title,
-            "subject": subject
-        }
-        response = requests.post(url, data=data, files=files, headers=headers)
-    
-    return response.json()
-
-# Upload a PDF
-result = upload_file(
-    topic_id="math-algebra-101",
-    title="Algebra Textbook Chapter 1",
-    file_path="./content/algebra-chapter1.pdf",
-    subject="Mathematics"
-)
-```
-
-**curl:**
-```bash
-curl -X POST http://localhost:8000/v1/content/ingest \
-  -H "Authorization: Bearer npk_abc123def456" \
-  -F "topic_id=math-algebra-101" \
-  -F "title=Algebra Textbook Chapter 1" \
-  -F "subject=Mathematics" \
-  -F "file=@/path/to/algebra-chapter1.pdf"
-```
-
-### Session Management
-
-```python
-# Get session details including message history
-def get_session(session_id: str):
-    url = f"{BASE_URL}/v1/sessions/{session_id}"
-    response = requests.get(url, headers={"Authorization": f"Bearer {API_KEY}"})
-    return response.json()
-
-# Delete a session
-def delete_session(session_id: str):
-    url = f"{BASE_URL}/v1/sessions/{session_id}"
-    response = requests.delete(url, headers={"Authorization": f"Bearer {API_KEY}"})
-    return response.json()
-
-# Get session details
-session_data = get_session(session_id)
-print(f"Messages: {session_data['messages']}")
-```
-
-### Error Handling
-
-```python
-import requests
-
-def neuropetitorius_request(method: str, url: str, **kwargs):
-    """Make a request with proper error handling"""
-    try:
-        response = requests.request(method, url, **kwargs)
-        
-        if response.status_code == 401:
-            raise Exception("Authentication failed. Check your API key.")
-        elif response.status_code == 429:
-            raise Exception("Rate limit exceeded. Please try again later.")
-        elif response.status_code >= 400:
-            error_data = response.json()
-            raise Exception(f"API Error: {error_data['error']['message']}")
-        
-        return response.json()
-    
-    except requests.exceptions.ConnectionError:
-        raise Exception("Connection failed. Check the API URL.")
-    except requests.exceptions.Timeout:
-        raise Exception("Request timed out.")
-
-# Usage
-try:
-    result = neuropetitorius_request(
-        "POST",
-        f"{BASE_URL}/v1/sessions",
-        headers={"Authorization": f"Bearer {API_KEY}"},
-        json={"topic_id": "test", "student_external_id": "test", "title": "test"}
-    )
-except Exception as e:
-    print(f"Error: {e}")
-```
-
-### Streaming Responses
-
-For a better user experience with longer AI responses, use Server-Sent Events (SSE):
-
-```python
-# See "Python Example (Streaming with SSE)" above
-```
+Common error codes:
+- `CONTENT_TOO_LARGE` — over 100,000 chars
+- `CONTENT_TOO_SHORT` — under 50 chars
+- `SESSION_NOT_FOUND` — session expired or invalid
+- `RATE_LIMITED` — retry after indicated seconds
 
 ---
 
-## Best Practices
+## Going Live Checklist
 
-1. **Secure Your API Key** - Never expose your API key in client-side code
-2. **Handle Errors Gracefully** - Implement retry logic for transient errors
-3. **Use Streaming for Long Responses** - Enable SSE for better UX
-4. **Validate Input** - Check request parameters before sending
-5. **Monitor Rate Limits** - Implement request throttling in your application
+- [ ] API key stored securely (env variable)
+- [ ] Integration tested in staging
+- [ ] Error handling implemented
+- [ ] Rate limiting respected
+- [ ] Streaming endpoint tested
+- [ ] Health check verified
+- [ ] GDPR compliance confirmed
 
 ---
 
 ## Support
 
-- **Email:** api-support@neuropetitorius.com
-- **Documentation:** https://docs.neuropetitorius.com
-- **Status Page:** https://status.neuropetitorius.com
+- **Email:** api-support@neuropetitorius.eu
+- **Status:** https://status.neuropetitorius.eu

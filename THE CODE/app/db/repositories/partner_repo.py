@@ -36,6 +36,9 @@ class PartnerRepository:
         api_key_hash: str,
         api_key_prefix: str,
         contact_email: str,
+        rate_limit_rpm: int = 1000,
+        rate_limit_messages_pm: int = 60,
+        allowed_origins: str | None = None,
     ) -> "Partner":
         """Create a new partner."""
         from app.db.models import Partner
@@ -46,6 +49,9 @@ class PartnerRepository:
             api_key_hash=api_key_hash,
             api_key_prefix=api_key_prefix,
             contact_email=contact_email,
+            rate_limit_rpm=rate_limit_rpm,
+            rate_limit_messages_pm=rate_limit_messages_pm,
+            allowed_origins=allowed_origins,
         )
         db.add(partner)
         await db.commit()

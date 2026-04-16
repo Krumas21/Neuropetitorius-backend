@@ -3,35 +3,108 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: neuro
-      POSTGRES_PASSWORD: neuro_dev_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: neuro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - pgbackups:/backups
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U neuro"]
       interval: 5s
       timeout: 3s
       retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=1GB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=256MB"
+      - "-c"
+      - "effective_cache_size=3GB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "fsync=on"
+      - "-c"
+      - "synchronous_commit=on"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
 
   api:
     build: .
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      ENV: development
-      DATABASE_URL: postgresql+asyncpg://neuro:neuro_dev_password@postgres:5432/neuro
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyCQINjdjek9lk_Y_2JFNLDksZ0V0jTykes}
-      GEMINI_GENERATION_MODEL: gemini-3-flash-preview
-      GEMINI_EMBEDDING_MODEL: gemini-embedding-001
-      LOG_LEVEL: INFO
+      ENV: ${ENV:-production}
+      DATABASE_URL: postgresql+asyncpg://neuro:${DB_PASSWORD}@postgres:5432/neuro
+      REDIS_URL: redis://redis:6379/0
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_GENERATION_MODEL: ${GEMINI_GENERATION_MODEL:-gemini-2.0-flash}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      RATE_LIMIT_RPM: ${RATE_LIMIT_RPM:-1000}
+      RATE_LIMIT_MESSAGES_PM: ${RATE_LIMIT_MESSAGES_PM:-60}
+      RATE_LIMIT_CHAT_STUDENT_PM: ${RATE_LIMIT_CHAT_STUDENT_PM:-30}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_logs:/logs
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  pgbackups:
+  redisdata:
+  caddy_data:
+  caddy_logs:

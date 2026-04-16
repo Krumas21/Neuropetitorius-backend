@@ -1,7 +1,10 @@
 """Usage event repository for data access."""
 
 import uuid
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+
+from sqlalchemy import select, func
 
 if TYPE_CHECKING:
     from app.db.models import UsageEvent
@@ -39,6 +42,37 @@ class UsageRepository:
         await db.commit()
         await db.refresh(event)
         return event
+
+    async def get_partner_stats(
+        self,
+        db,
+        partner_id: uuid.UUID,
+        days: int = 30,
+    ) -> dict:
+        """Get usage statistics for a partner."""
+        from app.db.models import UsageEvent
+
+        since = datetime.utcnow() - timedelta(days=days)
+
+        result = await db.execute(
+            select(
+                func.count(UsageEvent.id),
+                func.coalesce(func.sum(UsageEvent.prompt_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.completion_tokens), 0),
+                func.coalesce(func.sum(UsageEvent.duration_ms), 0),
+            ).where(
+                UsageEvent.partner_id == partner_id,
+                UsageEvent.created_at >= since,
+            )
+        )
+
+        row = result.one()
+        return {
+            "total_requests": row[0] or 0,
+            "total_prompt_tokens": row[1],
+            "total_completion_tokens": row[2],
+            "total_duration_ms": row[3],
+        }
 
 
 usage_repo = UsageRepository()

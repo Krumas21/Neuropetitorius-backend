@@ -1,0 +1,42 @@
+{
+    email admin@neuropetitorius.eu
+}
+
+api.neuropetitorius.eu {
+    handle /v1/health* {
+        reverse_proxy api:8000
+    }
+
+    handle /v1/sessions/*/messages/stream* {
+        reverse_proxy api:8000 {
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            transport http {
+                flush_interval -1
+            }
+        }
+        header X-Accel-Buffering no
+        header Content-Type text/event-stream
+    }
+
+    handle /v1/internal/* {
+        reverse_proxy api:8000
+    }
+
+    handle {
+        reverse_proxy api:8000 {
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+
+        header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        header X-Content-Type-Options "nosniff"
+        header X-Frame-Options "DENY"
+        header Referrer-Policy "strict-origin-when-cross-origin"
+        header Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+        header -Server
+    }
+}
