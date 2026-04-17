@@ -138,7 +138,7 @@ class LLMClient:
             model=self.embedding_model,
             contents=[text],
             config=types.EmbedContentConfig(
-                task_type="SEMANTIC_SIMILARITY",
+                task_type="RETRIEVAL_DOCUMENT",
             ),
         )
         return result.embeddings[0].values
